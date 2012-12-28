@@ -76,20 +76,21 @@
        history?     (boolean (some #{:nohistory} options))
        index?       (boolean (some #{:index} options)) ;index is not turned on by default, since it signifcantly slows down transactional write throughput
        unique?      (if (some #{:unique} options) :db.unique/value nil)
-       component?   (boolean (or (= value-type :component)(some #{:component} options)))
+       component?   (if (or (= value-type :component)(some #{:component} options)) true nil)
        type         (if component? :db.type/ref (type-permitted? (keyword "db.type" (name value-type))))]
-    
-    {:db/id           (api/tempid :db.part/db)
-     :db/ident        attr-name
-     :db/doc          documentation
-     :db/valueType    type
-     :db/isComponent  component?
-     :db/cardinality  cardinality
-     :db/index        index?
-     :db/fulltext     fulltext?
-     :db/noHistory    history?
-     :db/unique       unique?
-     :db.install/_attribute :db.part/db}))
+    (merge
+     {:db/id          (api/tempid :db.part/db)
+      :db/ident        attr-name
+      :db/valueType    type
+      :db/cardinality  cardinality
+      }
+     (when documentation {:db/doc  documentation})
+     (when component? {:db/isComponent  component?})
+     (when index? {:db/index index?})
+     (when fulltext? {:db/fulltext fulltext?})
+     (when history? {:db/noHistory history?})
+     (when unique? {:db/unique unique?})
+     {:db.install/_attribute :db.part/db})))
     
 (defn build-schema
   "Given a keyword namespace and a vector of vectors, creates a schema as described at

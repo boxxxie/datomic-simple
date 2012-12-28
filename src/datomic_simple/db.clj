@@ -17,31 +17,36 @@
                 *db*         (d/db conn)]
         (handler request)))))
 
-; *db* fns - these get overriden by repl-init in a repl
-(defn q [query & args] (apply d/q query *db* args))
-(defn entity [id] (d/entity *db* id))
-(defn resolve-tempid [tempids tempid] (d/resolve-tempid *db* tempids tempid))
 
 (defmacro with-bound-or-latest-database
   "Runs the body with the latest version of that database bound to
   *db*, rather than the request-consistent database."
   [& body]
-  `(binding [*db* (if (bound? #'*db*) *db* (d/db *connection*))]
+  `(binding [*connection* (d/connect *uri*)
+             *db* (if (bound? #'*db*) *db* (d/db *connection*))]
     ~@body))
+
+; *db* fns - these get overriden by repl-init in a repl
+;; (defn q [query & args] (apply d/q query *db* args))
+;; (defn entity [id] (d/entity *db* id))
+;; (defn resolve-tempid [tempids tempid] (d/resolve-tempid *db* tempids tempid))
+(defn q [query & args] (with-bound-or-latest-database (apply d/q query *db* args)))
+(defn resolve-tempid [tempids tempid] (with-bound-or-latest-database (d/resolve-tempid *db* tempids tempid)))
+(defn entity [id] (with-bound-or-latest-database (d/entity *db* id)))
+
 
 ; TODO: Wrap around fns with dynamic variables without needing to respecify their implementation
 (defn repl-init
   "Initializes repl by setting all required dynamic variables and wrapping datomic fns with them."
   [uri]
   (def ^:dynamic *connection* (d/connect uri))
-  (defn q [query & args] (with-bound-or-latest-database (apply d/q query *db* args)))
-  (defn resolve-tempid [tempids tempid] (with-bound-or-latest-database (d/resolve-tempid *db* tempids tempid)))
-  (defn entity [id] (with-bound-or-latest-database (d/entity *db* id))))
+  )
 
 (defn transact
   "Wraps around datomic.api/transact."
   [tx]
-  (d/transact *connection* tx))
+  (binding [*connection* (d/connect *uri*)]
+    (d/transact *connection* tx)))
 
 ; TODO: replace prn with proper logging
 (defn transact!
